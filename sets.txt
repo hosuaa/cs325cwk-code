@@ -1,0 +1,10 @@
+FIRST(program)=FIRST(extern_list) U FIRST(decl_list)={"extern","int","float","bool","void"}
+FIRST(decl_list)=FIRST(decl)={"int","float","bool","void"}
+FIRST(decl)=FIRST(var_decl) U FIRST(fun_decl)={"int","float","bool","void"}
+FIRST(var_decl)=FIRST(var_type)={"int","float","bool"}
+FIRST(var_type)={"int","float","bool"}
+FIRST(fun_decl)=FIRST(type_spec)={"int","float","bool","void"}
+FIRST(type_spec)=FIRST(var_type) U {"void"}={"int","float","bool","void"}
+
+FIRST(extern_list)=FIRST(extern)={"int","float","bool","void"}
+FIRST(extern)=FIRST("extern")-epsilon U FIRST(type_spec)={"extern","int","float","bool","void"}
