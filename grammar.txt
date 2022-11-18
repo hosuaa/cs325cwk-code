@@ -21,11 +21,11 @@
                     | epsilon
   param ::= var_type IDENT
   block ::= "{" local_decls stmt_list "}"
-  local_decls ::= epsilon local_declsprime
+  local_decls ::= local_declsprime
   local_declsprime ::= local_decl local_declsprime
                     | epsilon
   local_decl ::= var_type IDENT ";"
-  stmt_list ::= epsilon stmt_listprime
+  stmt_list ::= stmt_listprime
   stmt_listprime ::= stmt stmt_listprime
                     | epsilon
   stmt ::= expr_stmt 
@@ -174,3 +174,23 @@
   arg_list ::= expr arg_listprime
   arg_listprime ::= "," expr arg_listprime
   arg_listprime ::= ''
+
+
+int
+float
+bool
+variable
+expression
+if
+else
+while
+assignment
+binary operation
+function
+extern
+comparison
+addition
+multiplication
+variable
+function
+return?
