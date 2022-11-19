@@ -388,20 +388,14 @@ static void putBackToken(TOKEN tok) { tok_buffer.push_front(tok); }
 //===----------------------------------------------------------------------===//
 // AST nodes
 //===----------------------------------------------------------------------===//
-//types allowed in minic
-enum class TYPES {
-  INT,
-  FLOAT,
-  BOOL
-};
+
 //root of ast tree - the program. will contain the overall return value
 class AST {
 public:
   virtual ~AST() {}
-  virtual Value *codegen() = 0;
-  virtual std::string to_string() const {};
+  //virtual Value *codegen() = 0;
+  //virtual std::string to_string() const {};
 };
-
 //program is a list of statements
 class Statement : public AST {
 public:
@@ -430,11 +424,12 @@ public:
   //};
 };
 
+//root of ast. 
 class Program : public AST {
-  std::vector<AST*> Statements;
+  //std::vector<AST*> Statements;
 public:
-  Program(std::vector<AST*> statements) {
-    Statements = statements;
+  std::vector<Statement> Statements;
+  Program() {
   }
   //virtual Value *codegen() override;
   //virtual std::string to_string() const override {
@@ -443,14 +438,11 @@ public:
 };
 
 //list of statements
-class Block : public Statement {
-  std::vector<Statement*> Statements; //each statement is a node, adjacent elements in the list are directly connected in the ast
-  TOKEN Tok;
-
+class BlockClass : public Statement {
+  std::vector<Statement> Statements; //each statement is a node, adjacent elements in the list are directly connected in the ast
 public:
-  Block(std::vector<Statement*> statements, TOKEN tok) {//: Statements(statements), Tok(tok) {}
-    Statements = statements;
-    Tok = tok;
+  BlockClass(std::vector<Statement> statements) {//: Statements(statements), Tok(tok) {}
+    Statements = std::move(statements);
   }
   //virtual Value *codegen() override;
   //virtual std::string to_string() const override {
@@ -461,13 +453,11 @@ public:
 //if statements have 3 components - the comparison after the if, and 2 statements blocks : 1 if its true and 1 if its false.
 //Both statement blocks can optionally be null (e.g the expression in the if executes code and the statement blocks are uneeded, or no else is given)
 class IfThenElse : public Statement {
-  TOKEN Tok;
   std::unique_ptr<Expression> Cond; //condition?
-  std::unique_ptr<Block> Block1; //if cond then block1 else block2
-  std::unique_ptr<Block> Block2;
+  std::unique_ptr<BlockClass> Block1; //if cond then block1 else block2
+  std::unique_ptr<BlockClass> Block2;
 public:
-  IfThenElse(TOKEN tok, std::unique_ptr<Expression> cond, std::unique_ptr<Block> block1, std::unique_ptr<Block> block2)  {//: Val(val), Tok(tok) {}
-    Tok = tok;
+  IfThenElse(std::unique_ptr<Expression> cond, std::unique_ptr<BlockClass> block1, std::unique_ptr<BlockClass> block2)  {//: Val(val), Tok(tok) {}
     Cond = std::move(cond);
     Block1 = std::move(block1);
     Block2 = std::move(block2);
@@ -480,12 +470,10 @@ public:
 
 //while has 2 components - the condition to exit the while loop and the block to execute
 class WhileLoop : public Statement {
-  TOKEN Tok;
   std::unique_ptr<Expression> Cond; //condition?
-  std::unique_ptr<Block> Loop;
+  std::unique_ptr<BlockClass> Loop;
 public:
-  WhileLoop(TOKEN tok, std::unique_ptr<Expression> cond, std::unique_ptr<Block> loop) {//: Val(val), Tok(tok) {}
-    Tok = tok;
+  WhileLoop(std::unique_ptr<Expression> cond, std::unique_ptr<BlockClass> loop) {//: Val(val), Tok(tok) {}
     Cond = std::move(cond);
     Loop = std::move(loop);
   }
@@ -499,13 +487,11 @@ public:
 //potentially unecessary
 class Declaration : public Statement {
   std::string Name;
-  TYPES Type; //store type
-  TOKEN Tok;
+  std::string Type; //store type
 public:
-  Declaration(TYPES type, std::string name, TOKEN tok) {//: Val(val), Tok(tok) {}
+  Declaration(std::string type, std::string name) {//: Val(val), Tok(tok) {}
     Type = type;
     Name = name;
-    Tok = tok;
   }
   //virtual Value *codegen() override;
   //virtual std::string to_string() const override {
@@ -535,18 +521,17 @@ public:
 };
 
 //first line of a function, also to handle extern
-//name type args
+//type name args
 class Prototype : public Statement {
+  std::string Type;
   std::string Name;
-  //Type type;
-  std::vector<std::string> Args;
-  TOKEN Tok;
+  std::vector<Declaration> Args;
 
 public:
-  Prototype(std::string name, std::vector<std::string> args, TOKEN tok) {//: Val(val), Tok(tok) {}
+  Prototype(std::string type, std::string name, std::vector<Declaration> args) {
+    Type = type;
     Name = name;
     Args = std::move(args);
-    Tok = tok;
   }
   //virtual Value *codegen() override;
   //virtual std::string to_string() const override {
@@ -558,15 +543,11 @@ public:
 //made up of function prototype and statement block
 class VoidFunction : public Statement {
   std::unique_ptr<Prototype> Proto;
-  std::unique_ptr<Block> Body;
-  TOKEN Tok;
-  
-
+  std::unique_ptr<BlockClass> Body;
 public:
-  VoidFunction(std::unique_ptr<Prototype> proto, std::unique_ptr<Block> body, TOKEN tok) {//: Val(val), Tok(tok) {}
+  VoidFunction(std::unique_ptr<Prototype> proto, std::unique_ptr<BlockClass> body) {//: Val(val), Tok(tok) {}
     Proto = std::move(proto);
     Body = std::move(body);
-    Tok = tok;
   }
   //virtual Value *codegen() override;
   //virtual std::string to_string() const override {
@@ -575,13 +556,13 @@ public:
 };
 //a function consists of the prototype and the body (statement block) 
 //non void so will return 
-class Function : public Statement {
-  std::string Name;
+class Func : public Statement {
+  //std::string Name;
   std::unique_ptr<Prototype> Proto;
-  std::unique_ptr<Block> Body;
+  std::unique_ptr<BlockClass> Body;
 
 public:
-  Function(std::unique_ptr<Prototype> proto, std::unique_ptr<Block> body) {//: Val(val), Tok(tok) {}
+  Func(std::unique_ptr<Prototype> proto, std::unique_ptr<BlockClass> body) {//: Val(val), Tok(tok) {}
     Proto = std::move(proto);
     Body = std::move(body);
   }
@@ -592,10 +573,10 @@ public:
 };
 
 class Literal : public Expression {
-  TYPES Type;
+  std::string Name;
 public:
-  Literal(TYPES type) {
-    Type = type;
+  Literal(std::string name) {
+    Name = name;
   }
 };
 
@@ -844,7 +825,7 @@ static bool Expr() {
   CurTok=CurTokCopy;
   return Rval();
 }
-static bool ReturnStmt() {
+static bool ReturnStmt(std::vector<Statement> block) {
   if (CurTok.type==RETURN) {
     printf("%s ",CurTok.lexeme.c_str());
     CurTok = getNextToken();
@@ -862,16 +843,16 @@ static bool ReturnStmt() {
   }
   return false;
 }
-static bool Block(); //define for ElseStmt(), IfStmt() and Stmt()
-static bool ElseStmt() {
+static bool Block(std::vector<Statement> block); //define for ElseStmt(), IfStmt() and Stmt()
+static bool ElseStmt(std::vector<Statement> block) {
   if (CurTok.type==ELSE) {
     printf("%s ",CurTok.lexeme.c_str());
     CurTok = getNextToken();
-    return Block();
+    return Block(block);
   }
   return true;
 }
-static bool IfStmt() {
+static bool IfStmt(std::vector<Statement> block) {
   if (CurTok.type==IF) {
     printf("%s ",CurTok.lexeme.c_str());
     CurTok = getNextToken();
@@ -882,8 +863,8 @@ static bool IfStmt() {
         if (CurTok.type==RPAR) {
           printf("%s ",CurTok.lexeme.c_str());
           CurTok = getNextToken();
-          if (Block()) {
-            return ElseStmt();
+          if (Block(block)) {
+            return ElseStmt(block);
           }
         }
       }
@@ -891,8 +872,8 @@ static bool IfStmt() {
   }
   return false;
 }
-static bool Stmt(); //define for WhileStmt()
-static bool WhileStmt() {
+static bool Stmt(std::vector<Statement> block); //define for WhileStmt()
+static bool WhileStmt(std::vector<Statement> block) {
   if (CurTok.type==WHILE) {
     printf("%s ",CurTok.lexeme.c_str());
     CurTok = getNextToken();
@@ -903,14 +884,14 @@ static bool WhileStmt() {
         if (CurTok.type==RPAR) {
           printf("%s ",CurTok.lexeme.c_str());
           CurTok = getNextToken();
-          return Stmt();
+          return Stmt(block);
         }
       }
     }
   }
   return false;
 }
-static bool ExprStmt() {
+static bool ExprStmt(std::vector<Statement> block) {
   if (Expr()) {
     if (CurTok.type==SC) {
       printf("%s\n",CurTok.lexeme.c_str());
@@ -919,46 +900,53 @@ static bool ExprStmt() {
     }
   }
   if (CurTok.type==SC) {
+
     printf("%s\n",CurTok.lexeme.c_str());
     CurTok = getNextToken();
     return true;
   }
   return false;
 }
-static bool Stmt() {
+static bool Stmt(std::vector<Statement> block) {
   if (CurTok.type==LBRA) { //FIRST(Block)
-    return Block();
+    return Block(block);
   }
   if (CurTok.type==IF) { //FIRST(ifstmt)
-    return IfStmt();
+    return IfStmt(block);
   }
   if (CurTok.type==WHILE) {
-    return WhileStmt();
+    return WhileStmt(block);
   }
   if (CurTok.type==RETURN) {
-    return ReturnStmt();
+    return ReturnStmt(block);
   }
   if ((CurTok.type==SC)||(CurTok.type==IDENT)||(CurTok.type==MINUS)||(CurTok.type==NOT)||(CurTok.type==LPAR)||(CurTok.type==INT_LIT)||(CurTok.type==FLOAT_LIT)||(CurTok.type==BOOL_LIT)) {
-    return ExprStmt();
+    return ExprStmt(block);
   }
   return false;
 }
-static bool StmtListPrime() {
-  if (Stmt()) {
-    return StmtListPrime();
+static bool StmtListPrime(std::vector<Statement> block) {
+  if (Stmt(block)) {
+    return StmtListPrime(block);
   }
   return true;
 }
-static bool StmtList() {
-  return StmtListPrime();
+static bool StmtList(std::vector<Statement> block) {
+  return StmtListPrime(block);
 }
-static bool VarType(); //define for LocalDecl() and Param()
-static bool LocalDecl() {
-  if (VarType()) {
+static std::string VarType(); //define for LocalDecl() and Param()
+static bool LocalDecl(std::vector<Statement> block) {
+  std::string type = VarType();
+  if (type!="null") {
     if (CurTok.type==IDENT) {
+      std::string name = CurTok.lexeme.c_str();
       printf("%s ",CurTok.lexeme.c_str());
       CurTok = getNextToken();
       if (CurTok.type==SC) {
+        //make decl and add to block
+        std::unique_ptr<Declaration> decl = std::make_unique<Declaration>(type, name);
+        block.push_back(*decl);
+
         printf("%s\n",CurTok.lexeme.c_str());
         CurTok = getNextToken();
         return true;
@@ -967,24 +955,24 @@ static bool LocalDecl() {
   }
   return false;
 }
-static bool LocalDeclsPrime() {
-  if (LocalDecl()) {
-    return LocalDeclsPrime();
+static bool LocalDeclsPrime(std::vector<Statement> block) {
+  if (LocalDecl(block)) {
+    return LocalDeclsPrime(block);
   }
   return true;
 }
-static bool LocalDecls() {
-  if (LocalDeclsPrime()) {
+static bool LocalDecls(std::vector<Statement> block) {
+  if (LocalDeclsPrime(block)) {
     return true;
   }
   return false;
 }
-static bool Block() {
+static bool Block(std::vector<Statement> block) {
   if (CurTok.type==LBRA) {
     printf("%s\n ",CurTok.lexeme.c_str());
       CurTok = getNextToken();
-      if (LocalDecls()) {
-        if (StmtList()) {
+      if (LocalDecls(block)) {
+        if (StmtList(block)) {
           if (CurTok.type==RBRA) {
             printf("%s\n ",CurTok.lexeme.c_str());
             CurTok = getNextToken();
@@ -995,57 +983,82 @@ static bool Block() {
   }
   return false;
 }
-static bool Param() {
-  if (VarType()) {
+static bool Param(std::vector<Declaration> params) {
+  std::string type = VarType();
+  if (type!="null") {
     if (CurTok.type==IDENT) {
+      std::string name = CurTok.lexeme.c_str();
       printf("%s ",CurTok.lexeme.c_str());
       //add this to current args vector for function prototype
+      std::unique_ptr<Declaration> param = std::make_unique<Declaration>(type, name);
+      params.push_back(*param);
       CurTok = getNextToken();
-        return true;
+      return true;
     }
   }
   return false;
 }
-static bool ParamListPrime() {
+static bool ParamListPrime(std::vector<Declaration> params) {
   if (CurTok.type==COMMA) {
     printf("%s ",CurTok.lexeme.c_str());
     CurTok = getNextToken();
-    if (Param()) {
-      return ParamListPrime();
+    if (Param(params)) {
+      return ParamListPrime(params);
     } 
   }
   return true;
 }
-static bool ParamList() {
-  if (Param()) {
-    return ParamListPrime();
+static bool ParamList(std::vector<Declaration> params) {
+  if (Param(params)) {
+    return ParamListPrime(params);
   }
   return false;
 }
-static bool Params() {
-  if (ParamList()) {
-    return true;
-  } else if (CurTok.type==VOID_TOK) {
+static bool Params(std::vector<Declaration> params) {
+  if (CurTok.type==VOID_TOK) {
+
+    std::string type = "void";
+    std::string name = "null";
+    std::unique_ptr<Declaration> param = std::make_unique<Declaration>(type, name);
+    params.push_back(*param);
     printf("%s ",CurTok.lexeme.c_str());
     CurTok = getNextToken();
-    return true;
+    return true; //?
+  } else if (ParamList(params)) {
+      //printf("%s ",CurTok.lexeme.c_str());
+      //CurTok = getNextToken();
+      return true;
   }
   return true;
 }
-static bool TypeSpec(); //define for FunDecl()
-static bool FunDecl() {
-  if (TypeSpec()) {
+static std::string TypeSpec(); //define for FunDecl()
+static bool FunDecl(Program* prog) {
+  std::string type = TypeSpec();
+  if (type!="null") {
     if (CurTok.type==IDENT) {
+      std::string name = CurTok.lexeme.c_str();
       printf("%s ",CurTok.lexeme.c_str());
       CurTok = getNextToken();
       if (CurTok.type==LPAR) {
         printf("%s ",CurTok.lexeme.c_str());
         CurTok = getNextToken();
-        if (Params()) {
+        std::vector<Declaration> params;
+        if (Params(params)) {
           if (CurTok.type==RPAR) {
             printf("%s ",CurTok.lexeme.c_str());
             CurTok = getNextToken();
-            return Block();
+            //get block which is a list of statements
+            std::vector<Statement> statementBlock;
+            if (Block(statementBlock)) {
+              //make prototype
+              std::unique_ptr<Prototype> proto = std::make_unique<Prototype>(type, name, params);
+              //make function class - prototype and body
+              std::unique_ptr<BlockClass> body = std::make_unique<BlockClass>(statementBlock);
+              std::unique_ptr<Func> fun = std::make_unique<Func>(std::move(proto), std::move(body));
+              prog->Statements.push_back(*fun);
+              return true;
+            }
+            //return false;
           }
         }
       }
@@ -1053,28 +1066,35 @@ static bool FunDecl() {
   }
   return false;
 }
-static bool VarType() {
+static std::string VarType() {
   if (CurTok.type==INT_TOK || CurTok.type==FLOAT_TOK || CurTok.type==BOOL_TOK) {
     printf("%s ",CurTok.lexeme.c_str());
+    std::string type = CurTok.lexeme.c_str();
     CurTok = getNextToken();
-    return true;
+    return type;
   }
-  return false;
+  return "null";
 }
-static bool TypeSpec() {
+static std::string TypeSpec() {
   if (CurTok.type==VOID_TOK) {
     printf("%s ",CurTok.lexeme.c_str());
     CurTok = getNextToken();
-    return true;
+    return "void";
   }
   return VarType();
 }
-static bool VarDecl() {
-  if (VarType()) {
+static bool VarDecl(Program* prog) {
+  std::string type = VarType();
+  if (type!="null") {
     if (CurTok.type==IDENT) {
+      std::string name = CurTok.lexeme.c_str();
       printf("%s ",CurTok.lexeme.c_str());
       CurTok = getNextToken();
       if (CurTok.type==SC) {
+
+        std::unique_ptr<Declaration> decl = std::make_unique<Declaration>(type, name);
+        prog->Statements.push_back(*decl);
+
         printf("%s\n",CurTok.lexeme.c_str());
         CurTok = getNextToken();
         return true;
@@ -1083,9 +1103,9 @@ static bool VarDecl() {
   }
   return false;
 }
-static bool Decl() {
+static bool Decl(Program* prog) {
   if (CurTok.type==VOID_TOK) {
-    return FunDecl();
+    return FunDecl(prog);
   }
   TOKEN CurTokCopy = CurTok;
   TOKEN lookahead = getNextToken();
@@ -1095,41 +1115,50 @@ static bool Decl() {
     putBackToken(lookahead);
     putBackToken(CurTokCopy);
     CurTok = getNextToken();
-    return FunDecl();
+    return FunDecl(prog);
   }
   putBackToken(lookahead2);
   putBackToken(lookahead);
   putBackToken(CurTokCopy);
-  return (VarDecl());
+  return (VarDecl(prog));
 }
-static bool DeclListPrime() {
-  if (Decl()) {
-    return DeclListPrime();
+static bool DeclListPrime(Program* prog) {
+  if (Decl(prog)) {
+    return DeclListPrime(prog);
   }
   return true; 
 }
-static bool DeclList() {
-  if (Decl()) {
-    return DeclListPrime();
+static bool DeclList(Program* prog) {
+  if (Decl(prog)) {
+    return DeclListPrime(prog);
   }
   return false;
 }
-static bool Extern() {
+static bool Extern(Program* prog) {
   if (CurTok.type==EXTERN) {
     printf("%s ",CurTok.lexeme.c_str());
     CurTok = getNextToken();
-    if (TypeSpec()) {
+    std::string type = TypeSpec();
+    if (type!="null") {
       if (CurTok.type==IDENT) {
+        std::string name = CurTok.lexeme.c_str();
         printf("%s ",CurTok.lexeme.c_str());
         CurTok = getNextToken();
         if (CurTok.type==LPAR) {
           printf("%s ",CurTok.lexeme.c_str());
           CurTok = getNextToken();
-          if (Params()) {
+          //if params returns a string store it. its allowed to be empty
+          std::vector<Declaration> params;
+          if (Params(params)) {
             if (CurTok.type==RPAR) {
               printf("%s ",CurTok.lexeme.c_str());
               CurTok = getNextToken();
               if (CurTok.type==SC) {
+                //make prototype class type name args
+                //Prototype proto = new Prototype(type, name, params);
+                std::unique_ptr<Prototype> proto = std::make_unique<Prototype>(type, name, params); //maybe auto
+                //add prototype class to ast/return prototype
+                prog->Statements.push_back(*proto);
                 printf("%s\n",CurTok.lexeme.c_str());
                 CurTok = getNextToken();
                 return true;
@@ -1142,30 +1171,33 @@ static bool Extern() {
   }
   return false;
 }
-static bool ExternListPrime() {
-  if (Extern()) {
-    return ExternListPrime();
+static bool ExternListPrime(Program* prog) {
+  if (Extern(prog)) {
+    return ExternListPrime(prog);
   }
   return false;
 }
-static bool ExternList() {
-  if (Extern()) {
-    return ExternListPrime();
+static bool ExternList(Program* prog) {
+  if (Extern(prog)) {
+    return ExternListPrime(prog);
   }
   return false;
 }
 //entry point
-static void parser() {
-  // add body
+static void parser() { //std::unique_ptr<Program>
+  //ast is made up of its nodes
+  //std::unique_ptr<Program> TODELETE = std::make_unique<Program>();
+  Program prog;
+
   CurTok = getNextToken();
-  if (ExternList()) {
-    if (DeclList()) {
+  if (ExternList(&prog)) {
+    if (DeclList(&prog)) {
       if (CurTok.type==EOF_TOK) {
-        printf("Success\n");
+        printf("Success\n"); 
       }
     }
   }
-  if (DeclList()) {
+  if (DeclList(&prog)) {
     if (CurTok.type==EOF_TOK) {
       printf("Success\n");
     }
@@ -1222,7 +1254,7 @@ int main(int argc, char **argv) {
   TheModule = std::make_unique<Module>("mini-c", TheContext);
 
   // Run the parser now.
-  parser();
+  parser(); // auto tree = parser();
   fprintf(stderr, "Parsing Finished\n");
 
   //********************* Start printing final IR **************************
